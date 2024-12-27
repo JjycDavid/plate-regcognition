@@ -1,3 +1,4 @@
+import time  # 导入time模块
 import cv2
 import os
 from tkinter.filedialog import askopenfilename
@@ -52,16 +53,8 @@ class UI_main(ttk.Frame):
         self.color_ct2.grid(column=0, row=10, sticky=tk.W)
 
         # 界面右下角
-        from_pic_ctl = ttk.Button(frame_right_2, text="车牌图片", width=20, command=self.from_pic)
+        from_pic_ctl = ttk.Button(frame_right_2, text="点击放入车牌图片", width=20, command=self.from_pic)
         from_pic_ctl.grid(column=0, row=1)
-
-        # 清除识别数据
-        from_pic_chu = ttk.Button(frame_right_2, text="清除识别数据", width=20, command=self.clean)
-        from_pic_chu.grid(column=0, row=2)
-
-        # 查看图像处理过程
-        from_pic_chu = ttk.Button(frame_right_2, text="查看图像处理过程", width=20, command=self.pic_chuli)
-        from_pic_chu.grid(column=0, row=3)
 
         self.clean()
 
@@ -86,22 +79,35 @@ class UI_main(ttk.Frame):
             print("错误：未选择图片路径")
             return
 
+        # 记录开始时间
+        start_time = time.time()
+
         img_bgr = img_math.img_read(pic_path)
         if img_bgr is None:
             print("错误：读取图片失败")
             return
 
         first_img, oldimg = self.predictor.img_first_pre(img_bgr)
+        if first_img is None or oldimg is None:
+            print("错误：图像预处理失败")
+            return  # 如果图像为空，停止后续操作
+
         if not self.cameraflag:
             self.imgtk = self.get_imgtk(img_bgr)
             self.image_ctl.configure(image=self.imgtk)
 
+        # 确保 img_only_color 返回的值是有效的
         r_color, roi_color, color_color = self.predictor.img_only_color(oldimg, oldimg, first_img)
-        self.color_ct2.configure(background=color_color)
+        if r_color is None or roi_color is None or color_color is None:
+            print("错误：图像处理返回值为空")
+            return  # 如果返回值为空，停止后续操作
 
         self.show_roi(r_color, roi_color, color_color)
-        self.colorimg = color_color
-        print(color_color, "|", r_color, self.pic_source)
+
+        # 记录结束时间并计算处理时长
+        end_time = time.time()
+        processing_time = end_time - start_time
+        print(f"车牌识别处理时间: {processing_time:.2f}秒")
 
     # 来自图片---> 打开系统接口获取图片绝对路径
     def from_pic(self):
@@ -126,11 +132,6 @@ class UI_main(ttk.Frame):
                 self.roi_ct2.configure(state='disabled')
 
             self.r_ct2.configure(text=str(r))
-            try:
-                c = self.color_transform[color]
-                self.color_ct2.configure(text=c[0], state='enable')
-            except KeyError:
-                self.color_ct2.configure(state='disabled')
 
     # 清除识别数据, 还原初始结果
     def clean(self):
@@ -140,8 +141,8 @@ class UI_main(ttk.Frame):
 
         self.r_ct2.configure(text="")
         self.color_ct2.configure(text="", state='enable')
-        # 显示车牌颜色
-        self.color_ct2.configure(background='white', text="颜色", state='enable')
+        # # 显示车牌颜色
+        # self.color_ct2.configure(background='white', text="颜色", state='enable')
         self.pilImage3 = Image.open("pic/locate.png")
         pil_image_resized = self.pilImage3.resize((200, 50), Image.Resampling.LANCZOS)
         self.tkImage3 = ImageTk.PhotoImage(image=pil_image_resized)
